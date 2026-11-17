@@ -99,10 +99,27 @@ def infer_path(evidence, settings, anchors):
     return paths
 
 
-def trace(image, calibration, settings, anchors):
+def evidence_mask(mask, calibration, size):
+    """Sample a source-pixel sampling mask on the rectified chart grid."""
+    if mask is None:
+        return None
+    width,height=size
+    grid=Coordinates(calibration).grid(width,height).astype(np.float32)
+    sampled=cv2.remap(np.ascontiguousarray(mask.astype(np.uint8)),grid[:,:,0],grid[:,:,1],
+                      cv2.INTER_LINEAR,borderMode=cv2.BORDER_CONSTANT)
+    return sampled.astype(np.float32)
+
+
+def trace(image, calibration, settings, anchors, mask=None):
     size=(settings['width'],settings['height'])
     rgb,coverage=rectify(image,calibration,size)
     evidence=color_evidence(rgb,coverage,settings['color'],settings['tolerance'])
+    allowed=evidence_mask(mask,calibration,size)
+    if allowed is not None:
+        # The panel region is a hard sampling boundary: evidence outside it is
+        # erased, so a neighbouring panel's curve can never enter this path.
+        evidence*=allowed
+        coverage=coverage*allowed
     coords=Coordinates(calibration)
     chart_anchors=coords.pixels_to_chart([a['pixel'] for a in anchors]) if anchors else []
     paths=infer_path(evidence,settings,chart_anchors)
@@ -110,7 +127,7 @@ def trace(image, calibration, settings, anchors):
 
 
 def sample_paths(paths, calibration, count):
-    coords=Coordinates(calibration)
+    coords=calibration if isinstance(calibration,Coordinates) else Coordinates(calibration)
     rows=[]
     grid=np.linspace(0,1,count)
     # Missing evidence splits a run before interpolation. No extrapolation and

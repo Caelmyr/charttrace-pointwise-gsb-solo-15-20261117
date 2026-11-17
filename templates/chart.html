@@ -1,7 +1,383 @@
-<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ChartTrace · 曲线采集工作台</title><style>
-*{box-sizing:border-box}body{margin:0;color:#24334a;background:#edf1f7;font:14px system-ui}button,input,select{font:inherit}button{cursor:pointer;border:1px solid #d2dce9;background:white;border-radius:7px;padding:9px 13px;color:#24334a}button:hover{background:#edf4ff}button.primary{background:#235fe4;color:white;border:0}a{color:#235fe4;text-decoration:none}header{height:77px;background:white;border-bottom:1px solid #dce2eb;display:flex;align-items:center;justify-content:space-between;padding:0 30px}.logo{font-weight:800;font-size:24px;color:#215cce}.logo small{display:block;font-size:9px;letter-spacing:3px;color:#7d8ba1}main{display:grid;grid-template-columns:220px minmax(430px,1fr) 310px;gap:20px;padding:23px;max-width:1800px;margin:auto}.panel{background:white;border:1px solid #dbe3ee;border-radius:12px;overflow:hidden}.pad{padding:18px}h1{font-size:23px;margin:0 0 6px}h2{font-size:14px;margin:0 0 15px}p{color:#738198;line-height:1.7}.badge{font-size:11px;color:#498b70;background:#e4f7ee;padding:6px 9px;border-radius:6px}.cap{font-size:10px;color:#8c99ac;letter-spacing:1.5px;margin:24px 0 12px}.projects button{display:block;width:100%;text-align:left;margin:6px 0;overflow:hidden}.toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:12px;border-bottom:1px solid #e3e9f1}.stage{padding:18px;background:#f6f8fb;min-height:330px;display:grid;place-items:center}.stage canvas{max-width:100%;height:auto;background:white;box-shadow:0 4px 18px #273c5a16;cursor:crosshair}.status{padding:10px 16px;color:#5c728b;font-size:12px}.field{display:block;margin:12px 0;color:#68788e;font-size:12px}.field input,.field select{display:block;width:100%;padding:7px;border:1px solid #d3dce8;border-radius:5px;margin-top:5px;color:#24334a}.row{display:flex;gap:9px}.row>*{flex:1;min-width:0}.series{padding:14px;border-top:1px solid #e4eaf2}.series button{margin:3px}.metrics{display:flex;gap:30px;padding:20px}.metrics b{display:block;font-size:23px;margin-bottom:6px}.metrics small{color:#8795a8}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:12px}td,th{text-align:right;border-bottom:1px solid #edf1f6;padding:8px}th{color:#8b98aa}.table{max-height:260px;overflow:auto;padding:0 15px}.downloads{padding:14px;display:flex;gap:15px}.hint{font-size:11px;color:#8996aa;line-height:1.7}#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:13px 25px;background:#24344e;color:white;border-radius:8px;display:none}details{margin:12px 0}summary{cursor:pointer;color:#526987}#empty{text-align:center;padding:100px 20px}#empty h2{font-size:20px}.versions button{display:block;margin:5px 0;width:100%}@media(max-width:1100px){main{grid-template-columns:180px 1fr}.right{grid-column:2}}@media(max-width:700px){main{display:block;padding:10px}.panel{margin-bottom:12px}header{padding:0 14px}.projects{display:flex;overflow:auto}.right{display:block}}
-</style></head><body><header><div class="logo">⌁ ChartTrace<small>IMAGE TO DATA WORKSPACE</small></div><div><a href="/prepare" target="_blank">图像预处理 ↗</a> &nbsp; <span class="badge">本地采集 · 原图留存</span></div></header><main><aside><section class="panel pad"><h2>图表工程</h2><button id="create" class="primary">＋ 新建合成示范</button><div class="cap">RECENT CHARTS</div><div id="projects" class="projects"></div><p class="hint">先打开示范，也可上传自己的PNG/JPEG。合成示范并非真实实验观测。</p></section><p class="hint">支持斜轴、线性与对数标定；颜色追踪适用于单值曲线。先校准轴，再选择曲线颜色。自动结果须人工核对。</p></aside><section><div class="row" style="align-items:center;margin:2px 0 18px"><div><h1 id="title">从图表中找回数据</h1><div class="hint" id="revision">校准 · 追踪 · 校对 · 交付</div></div><button id="rename">重命名</button></div><section class="panel"><div class="toolbar"><button data-mode="inspect">浏览</button><button data-mode="origin">点原点</button><button data-mode="x_end">点X端</button><button data-mode="y_end">点Y端</button><button data-mode="color">吸取颜色</button><button data-mode="anchor">添加校对点</button><button id="toggle">原图 / 叠加</button></div><div class="stage"><canvas id="canvas" hidden></canvas><div id="empty"><h2>一张图表，一份可核对的数据。</h2><p>打开左侧合成示范，体验完整采集流程。</p></div></div><div class="status" id="status">等待打开工程</div><div class="series"><span>当前曲线 </span><select id="series"></select> <button id="add">＋ 曲线</button><button id="delete">删除曲线</button><button id="clear">清除校对点</button></div></section><section class="panel" style="margin-top:18px"><div class="metrics"><div><b id="rows">—</b><small>有效数据点</small></div><div><b id="quality">—</b><small>平均颜色置信度</small></div><div><b id="runs">—</b><small>追踪片段</small></div></div><div class="table"><table><thead><tr><th>曲线</th><th>X</th><th>Y</th><th>置信度</th></tr></thead><tbody id="data"></tbody></table></div><div class="downloads" id="downloads"></div><div class="pad hint">短缺口仅用于追踪连续性，不输出伪造观测；数据在标定轴的比例空间中均匀采样，缺口不插值。</div></section></section><aside class="right"><section class="panel pad"><h2>坐标标定</h2><div class="row"><label class="field">X起点<input id="xmin" type="number"></label><label class="field">X终点<input id="xmax" type="number"></label></div><label class="field">X轴<select id="xscale"><option value="linear">线性</option><option value="log">对数</option></select></label><div class="row"><label class="field">Y起点<input id="ymin" type="number"></label><label class="field">Y终点<input id="ymax" type="number"></label></div><label class="field">Y轴<select id="yscale"><option value="linear">线性</option><option value="log">对数</option></select></label><button id="calibrate">保存坐标范围</button><p class="hint">图上三点定义轴基底，端点可倾斜。负向或反向坐标可用，标定点必须不共线。</p><details><summary>精确标定点</summary><div id="coords"></div><button id="exact">保存像素坐标</button></details><hr style="border:0;border-top:1px solid #e5eaf2"><h2>曲线追踪</h2><label class="field">曲线颜色<input id="color" type="color"></label><div id="settings"></div><button class="primary" id="extract" style="width:100%;margin-top:10px">提取并保存结果</button><label class="field">替换源图<input id="upload" type="file" accept="image/png,image/jpeg"></label><p class="hint">替换源图会重新标定并清空校对点；历史结果仍可下载。</p><details><summary>版本与历史</summary><button id="snapshot">保存命名版本</button><div class="versions" id="versions"></div><div class="versions" id="history"></div></details></section></aside></main><div id="toast" role="status"></div><script>
-let p=null, sid=null, result=null,mode='inspect',source=new Image(),overlay=new Image(),showOverlay=true;const $=id=>document.getElementById(id);const cv=$('canvas'),ctx=cv.getContext('2d');const endpoint=()=>'/chart/api/projects/'+p.id;function toast(t){$('toast').textContent=t;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',3500)}async function api(url,method='GET',data){const r=await fetch(url,{method,headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'请求失败');return d}async function safely(fn){try{await fn()}catch(e){toast(e.message)}}function selected(){return p.series.find(s=>s.id===sid)||p.series[0]}async function list(){const a=await api('/chart/api/projects');$('projects').replaceChildren(...a.map(x=>{const b=document.createElement('button');b.textContent=x.name;b.onclick=()=>safely(()=>open(x.id));return b}))}async function open(id){p=await api('/chart/api/projects/'+id);sid=p.series[0]?.id;result=null;source.src=endpoint()+'/source.png?v='+p.revision;source.onload=draw;render();if(p.current_result)await loadResult(p.current_result)}function draw(){if(!p||!source.naturalWidth)return;cv.hidden=false;$('empty').hidden=true;cv.width=source.naturalWidth;cv.height=source.naturalHeight;ctx.drawImage(showOverlay&&result&&overlay.complete&&overlay.naturalWidth?overlay:source,0,0);if(!result||!showOverlay){ctx.strokeStyle='#f79a26';ctx.lineWidth=2;ctx.beginPath();['x_end','origin','y_end'].forEach((k,i)=>{const a=p.calibration[k];i?ctx.lineTo(...a):ctx.moveTo(...a)});ctx.stroke();for(const a of selected()?.anchors||[]){ctx.fillStyle='#aa44dd';ctx.beginPath();ctx.arc(...a.pixel,5,0,Math.PI*2);ctx.fill()}}}function render(){if(!p)return;$('title').textContent=p.name;$('revision').textContent='REV '+p.revision+' · '+p.series.length+' 条曲线 · 校对点固定于源图像素';$('series').replaceChildren(...p.series.map(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.name;return o}));if(!p.series.some(s=>s.id===sid))sid=p.series[0]?.id;$('series').value=sid;for(const a of ['x','y']){const c=p.calibration[a];$(a+'min').value=c.min;$(a+'max').value=c.max;$(a+'scale').value=c.scale}$('coords').replaceChildren(...['origin','x_end','y_end'].map(k=>{const l=document.createElement('label');l.className='field';l.textContent={origin:'原点',x_end:'X端点',y_end:'Y端点'}[k];const i=document.createElement('input');i.id=k;i.value=p.calibration[k].join(', ');l.append(i);return l}));const s=selected();$('settings').innerHTML='';if(s){$('color').value='#'+s.settings.color.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');for(const [key,label]of Object.entries({tolerance:'颜色容差',smoothness:'连续性约束',max_step:'相邻列最大步长',gap_limit:'允许短缺口列数',min_confidence:'最低颜色置信度',width:'追踪横向分辨率',height:'追踪纵向分辨率',samples:'导出采样数量'})){const l=document.createElement('label');l.className='field';l.textContent=label;const i=document.createElement('input');i.id='s_'+key;i.type='number';i.step=['tolerance','smoothness','min_confidence'].includes(key)?'any':'1';i.value=s.settings[key];l.append(i);$('settings').append(l)}}$('versions').replaceChildren(...p.versions.map(v=>{const b=document.createElement('button');b.textContent='恢复 '+v.label;b.onclick=()=>safely(async()=>{p=await api(endpoint()+'/versions/'+v.id+'/restore','POST',{revision:p.revision});await open(p.id)});return b}));$('history').replaceChildren(...p.results.slice().reverse().map(r=>{const b=document.createElement('button');b.textContent='历史结果 REV '+r.revision;b.onclick=()=>safely(()=>loadResult(r.id));return b}));if(!p.current_result){result=null;$('downloads').replaceChildren();$('rows').textContent='—';$('quality').textContent='—';$('runs').textContent='—';$('data').replaceChildren()}draw()}
-async function mutate(url,method,data){p=await api(url,method,{...data,revision:p.revision});render();await list()}async function loadResult(rid){result=await api(endpoint()+'/results/'+rid);overlay.src=endpoint()+'/results/'+rid+'/overlay.png';overlay.onload=draw;const rows=result.series.flatMap(s=>s.rows.map(r=>({...r,name:s.name})));$('rows').textContent=rows.length;$('quality').textContent=rows.length?(100*rows.reduce((a,r)=>a+r.confidence,0)/rows.length).toFixed(1)+'%':'—';$('runs').textContent=result.series.reduce((a,s)=>a+s.paths.length,0);$('data').replaceChildren(...rows.slice(0,250).map(r=>{const tr=document.createElement('tr');for(const v of [r.name,r.x.toPrecision(6),r.y.toPrecision(6),r.confidence.toFixed(3)]){const td=document.createElement('td');td.textContent=v;tr.append(td)}return tr}));$('downloads').replaceChildren(...[['data.csv','↓ CSV数据'],['bundle.zip','↓ 图像与数据包']].map(([file,label])=>{const a=document.createElement('a');a.href=endpoint()+'/results/'+rid+'/'+file;a.textContent=label;return a}));$('status').textContent='已保存提取结果 REV '+result.revision+' · '+rows.length+' 个数据点';draw()}
-$('create').onclick=()=>safely(async()=>{p=await api('/chart/api/projects','POST',{});await list();await open(p.id)});$('series').onchange=()=>{sid=$('series').value;render()};document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;$('status').textContent='当前操作：'+b.textContent+'，点击图像'});cv.onclick=e=>safely(async()=>{if(!p)return;const r=cv.getBoundingClientRect(),point=[(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height];if(['origin','x_end','y_end'].includes(mode)){await mutate(endpoint(),'PATCH',{calibration:{...p.calibration,[mode]:point}})}else if(mode==='anchor'&&selected()){await mutate(endpoint()+'/series/'+sid,'PATCH',{anchors:[...selected().anchors,{pixel:point}]})}else if(mode==='color'&&selected()){const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.drawImage(source,0,0);const color=Array.from(g.getImageData(...point.map(Math.round),1,1).data).slice(0,3);await mutate(endpoint()+'/series/'+sid,'PATCH',{settings:{color}})}else $('status').textContent='像素 '+point.map(v=>v.toFixed(1)).join(', ')});$('toggle').onclick=()=>{showOverlay=!showOverlay;draw()};$('rename').onclick=()=>safely(async()=>{if(!p)return;const name=prompt('工程名称',p.name);if(name)await mutate(endpoint(),'PATCH',{name})});$('calibrate').onclick=()=>safely(async()=>{const c=structuredClone(p.calibration);for(const a of ['x','y'])c[a]={min:Number($(a+'min').value),max:Number($(a+'max').value),scale:$(a+'scale').value};await mutate(endpoint(),'PATCH',{calibration:c})});$('exact').onclick=()=>safely(async()=>{const c=structuredClone(p.calibration);for(const k of ['origin','x_end','y_end'])c[k]=$(k).value.split(',').map(Number);await mutate(endpoint(),'PATCH',{calibration:c})});$('add').onclick=()=>safely(async()=>{const name=prompt('曲线名称','新曲线');if(name)await mutate(endpoint()+'/series','POST',{name})});$('delete').onclick=()=>safely(()=>mutate(endpoint()+'/series/'+sid,'DELETE',{}));$('clear').onclick=()=>safely(()=>mutate(endpoint()+'/series/'+sid,'PATCH',{anchors:[]}));$('extract').onclick=()=>safely(async()=>{if(!selected())return;const s={};for(const k of Object.keys(selected().settings))if(k!=='color')s[k]=Number($('s_'+k).value);s.color=$('color').value.match(/[a-f0-9]{2}/gi).map(v=>parseInt(v,16));$('extract').disabled=true;try{await mutate(endpoint()+'/series/'+sid,'PATCH',{settings:s});$('status').textContent='正在全局追踪…';result=await api(endpoint()+'/extract','POST',{});p=await api(endpoint());render();await loadResult(p.current_result)}finally{$('extract').disabled=false}});$('snapshot').onclick=()=>safely(async()=>{const label=prompt('版本名称','校对前');if(label){p=await api(endpoint()+'/versions','POST',{revision:p.revision,label});render()}});$('upload').onchange=()=>safely(async()=>{const form=new FormData();form.append('revision',p.revision);form.append('file',$('upload').files[0]);const r=await fetch(endpoint()+'/source',{method:'POST',body:form});const d=await r.json();if(!r.ok)throw Error(d.error);await open(d.id)});safely(list);
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ChartTrace · 多面板曲线采集工作台</title><style>
+*{box-sizing:border-box}body{margin:0;color:#24334a;background:#edf1f7;font:14px system-ui}button,input,select{font:inherit}button{cursor:pointer;border:1px solid #d2dce9;background:white;border-radius:7px;padding:9px 13px;color:#24334a}button:hover{background:#edf4ff}button.primary{background:#235fe4;color:white;border:0}a{color:#235fe4;text-decoration:none}header{height:77px;background:white;border-bottom:1px solid #dce2eb;display:flex;align-items:center;justify-content:space-between;padding:0 30px}.logo{font-weight:800;font-size:24px;color:#215cce}.logo small{display:block;font-size:9px;letter-spacing:3px;color:#7d8ba1}main{display:grid;grid-template-columns:220px minmax(430px,1fr) 320px;gap:20px;padding:23px;max-width:1860px;margin:auto}.panel{background:white;border:1px solid #dbe3ee;border-radius:12px;overflow:hidden}.pad{padding:18px}h1{font-size:23px;margin:0 0 6px}h2{font-size:14px;margin:0 0 15px}p{color:#738198;line-height:1.7}.badge{font-size:11px;color:#498b70;background:#e4f7ee;padding:6px 9px;border-radius:6px}.badge.warn{color:#9a6a18;background:#fbf0dc}.cap{font-size:10px;color:#8c99ac;letter-spacing:1.5px;margin:24px 0 12px}.projects button{display:block;width:100%;text-align:left;margin:6px 0;overflow:hidden}.toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:12px;border-bottom:1px solid #e3e9f1}.toolbar button.selected{background:#235fe4;color:white;border-color:#235fe4}.stage{padding:18px;background:#f6f8fb;min-height:330px;display:grid;place-items:center;position:relative}.stage canvas{max-width:100%;height:auto;background:white;box-shadow:0 4px 18px #273c5a16;cursor:crosshair}.status{padding:10px 16px;color:#5c728b;font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}.field{display:block;margin:12px 0;color:#68788e;font-size:12px}.field input,.field select{display:block;width:100%;padding:7px;border:1px solid #d3dce8;border-radius:5px;margin-top:5px;color:#24334a}.row{display:flex;gap:9px}.row>*{flex:1;min-width:0}.row.head>*{flex:0 0 auto}.row.head>div:first-child{flex:1}.series{padding:14px;border-top:1px solid #e4eaf2}.series button{margin:3px}.metrics{display:flex;gap:30px;padding:20px;flex-wrap:wrap}.metrics b{display:block;font-size:23px;margin-bottom:6px}.metrics small{color:#8795a8}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:12px}td,th{text-align:right;border-bottom:1px solid #edf1f6;padding:8px}th{color:#8b98aa}.table{max-height:260px;overflow:auto;padding:0 15px}.downloads{padding:14px;display:flex;gap:15px;flex-wrap:wrap}.hint{font-size:11px;color:#8996aa;line-height:1.7}#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:13px 25px;background:#24344e;color:white;border-radius:8px;display:none;z-index:5;max-width:80vw}details{margin:12px 0}summary{cursor:pointer;color:#526987}#empty{text-align:center;padding:70px 20px}#empty h2{font-size:20px}.versions button{display:block;margin:5px 0;width:100%;text-align:left}.tabs{display:flex;gap:4px;padding:10px 12px;border-bottom:1px solid #e3e9f1;background:#fafcff}.tabs button{border:0;background:none;padding:8px 12px;border-radius:6px}.tabs button.selected{background:#e7efff;color:#235fe4;font-weight:600}.panels{display:flex;flex-direction:column;gap:2px}.panels .item{display:flex;gap:6px;align-items:center;padding:8px 10px;border-radius:7px;cursor:pointer;border:1px solid transparent}.panels .item:hover{background:#f1f6ff}.panels .item.active{background:#e7efff;border-color:#bcd2ff}.panels .item small{display:block;color:#8b98aa;font-size:10px}.swatch{width:11px;height:11px;border-radius:3px;flex:0 0 auto}.pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;background:#eef2f8;color:#6d7c92}.pill.ok{background:#e4f7ee;color:#3f7f63}.pill.stale{background:#fbf0dc;color:#96631a}.pill.orphan{background:#f3e6e6;color:#8f4b4b}.applicable{font-size:11px;color:#7d8ba1;line-height:1.7;margin-top:6px}.applicable b{font-weight:600;color:#3f5673}.legend-band{font-size:11px;color:#96631a;line-height:1.6;margin-top:4px}.mini{font-size:10px;padding:5px 8px}.panelcard{border:1px solid #e4eaf2;border-radius:9px;padding:12px;margin:10px 0}.panelcard.active{border-color:#b9d0ff;background:#f7faff}.panelcard h3{font-size:13px;margin:0 0 8px;display:flex;align-items:center;gap:7px}@media(max-width:1100px){main{grid-template-columns:180px 1fr}.right{grid-column:2}}@media(max-width:700px){main{display:block;padding:10px}.panel{margin-bottom:12px}header{padding:0 14px}.projects{display:flex;overflow:auto}.right{display:block}}
+</style></head><body>
+<header><div class="logo">⌁ ChartTrace<small>ONE SHEET · MANY PANELS</small></div>
+<div><a href="/prepare" target="_blank">图像预处理 ↗</a> &nbsp; <span class="badge">本地采集 · 原图留存</span></div></header>
+<main>
+<aside>
+<section class="panel pad">
+<h2>图表工程</h2>
+<button id="create" class="primary">＋ 多面板合成示范</button>
+<button id="createSingle" style="width:100%;margin-top:6px">＋ 单面板示范</button>
+<div class="cap">RECENT CHARTS</div>
+<div id="projects" class="projects"></div>
+<p class="hint">在同一张原图上划分命名面板，每个面板独立标定、独立曲线、独立校对点。旧单面板工程会整幅图作为一个面板直接打开。</p>
+</section>
+<p class="hint">面板区域是取样边界：面板内的追踪只读取本面板像素；重叠区默认双方都不取样，因此共用的图例不会被误采为曲线。</p>
+</aside>
+<section>
+<div class="row head" style="align-items:center;margin:2px 0 18px">
+<div><h1 id="title">从一张截图里分别取数</h1><div class="hint" id="revision">面板 · 标定 · 追踪 · 校对 · 交付</div></div>
+<button id="rename">重命名</button>
+</div>
+<section class="panel">
+<div class="tabs"><button id="viewAll" class="selected">▦ 原图总览</button><button id="viewPanel">◳ 单面板操作</button><span class="hint" id="viewHint" style="margin-left:auto;align-self:center">总览：查看/移动面板区域</span></div>
+<div class="toolbar">
+<button data-mode="inspect" class="selected">浏览</button>
+<button data-mode="origin">点原点</button>
+<button data-mode="x_end">点X端</button>
+<button data-mode="y_end">点Y端</button>
+<button data-mode="color">吸取颜色</button>
+<button data-mode="anchor">添加校对点</button>
+<button id="toggle">原图 / 叠加</button>
+</div>
+<div class="stage"><canvas id="canvas" hidden></canvas>
+<div id="empty"><h2>一张原图，几个各自标定的面板。</h2><p>打开左侧多面板示范，或上传包含多幅并排小图的截图。</p></div></div>
+<div class="status" id="status"><span>等待打开工程</span></div>
+<div class="series"><span>面板 </span><select id="panelSelect"></select>
+<button id="addPanel" class="mini">＋ 面板</button><button id="deletePanel" class="mini">删除面板</button>
+<button id="renamePanel" class="mini">重命名面板</button></div>
+<div class="series"><span>当前曲线 </span><select id="series"></select>
+<button id="add">＋ 曲线</button><button id="delete">删除曲线</button><button id="clear">清除校对点</button></div>
+</section>
+<section class="panel" style="margin-top:18px">
+<div class="tabs"><button id="tabCurrent" class="selected">当前面板</button><button id="tabAll">全部面板结果</button></div>
+<div class="metrics"><div><b id="rows">—</b><small>有效数据点</small></div><div><b id="quality">—</b><small>平均颜色置信度</small></div><div><b id="runs">—</b><small>追踪片段</small></div><div><b id="panelCount">—</b><small>面板</small></div></div>
+<div class="table"><table><thead><tr><th>面板</th><th>曲线</th><th>X</th><th>Y</th><th>置信度</th></tr></thead><tbody id="data"></tbody></table></div>
+<div class="downloads" id="downloads"></div>
+<div class="pad hint">短缺口仅用于追踪连续性，不输出伪造观测；数据在各面板自己的标定比例空间中采样。CSV 首列保留面板归属，ZIP 另附每个面板单独的 CSV 与 panels.json。</div>
+</section>
+</section>
+<aside class="right">
+<section class="panel pad">
+<div class="tabs" style="padding:0 0 10px;border:0"><button id="tabPanel" class="selected">面板</button><button id="tabCalib">坐标</button><button id="tabTrack">追踪</button></div>
+<div id="panePanel">
+<h2>面板区域与重叠</h2>
+<div class="row"><label class="field">X<input id="r_x" type="number"></label><label class="field">Y<input id="r_y" type="number"></label></div>
+<div class="row"><label class="field">宽<input id="r_w" type="number"></label><label class="field">高<input id="r_h" type="number"></label></div>
+<label class="field">与相邻面板的重叠区<select id="overlap"><option value="exclude">双方都不取样（推荐）</option><option value="include">本面板取样</option></select></label>
+<button id="saveRegion">保存面板区域</button>
+<p class="hint">移动或缩放面板时，标定轴按同一比例随之移动，校对点固定在源图像素不移动。</p>
+<div class="applicable" id="applicable"></div>
+<div class="legend-band" id="overlapNote"></div>
+</div>
+<div id="paneCalib" hidden>
+<h2>坐标标定</h2>
+<div class="row"><label class="field">X起点<input id="xmin" type="number"></label><label class="field">X终点<input id="xmax" type="number"></label></div>
+<label class="field">X轴<select id="xscale"><option value="linear">线性</option><option value="log">对数</option></select></label>
+<div class="row"><label class="field">Y起点<input id="ymin" type="number"></label><label class="field">Y终点<input id="ymax" type="number"></label></div>
+<label class="field">Y轴<select id="yscale"><option value="linear">线性</option><option value="log">对数</option></select></label>
+<button id="calibrate">保存坐标范围</button>
+<button id="calibrateRegion" style="margin-top:6px">按面板矩形重置三点</button>
+<p class="hint">本面板的轴独立于其他面板；共线或过短的轴会被拒绝。图上三点定义轴基底，端点可倾斜。</p>
+<details><summary>精确标定点</summary><div id="coords"></div><button id="exact">保存像素坐标</button></details>
+</div>
+<div id="paneTrack" hidden>
+<h2>曲线追踪</h2>
+<label class="field">曲线颜色<input id="color" type="color"></label>
+<div id="settings"></div>
+<button class="primary" id="extract" style="width:100%;margin-top:10px">提取全部面板</button>
+<label class="field">替换源图<input id="upload" type="file" accept="image/png,image/jpeg"></label>
+<p class="hint">替换源图会把已有面板区域收回图内并清空校对点；历史结果仍可按当时标定下载。</p>
+</div>
+<hr style="border:0;border-top:1px solid #e5eaf2">
+<details open><summary>版本与历史</summary>
+<button id="snapshot">保存命名版本</button>
+<div class="versions" id="versions"></div>
+<div class="cap" style="margin:14px 0 6px">历史提取</div>
+<div class="versions" id="history"></div>
+<div class="hint" id="resultState"></div>
+</details>
+</section>
+</aside>
+</main>
+<div id="toast" role="status"></div>
+<script>
+{% raw %}
+'use strict';
+const $=id=>document.getElementById(id),ctx=$('canvas').getContext('2d');
+const S={p:null,pid:null,sid:null,result:null,mode:'inspect',view:'all',showOverlay:true,
+  source:new Image(),overlay:new Image(),tab:'panel',rowsTab:'current',drag:null,dirty:false};
+const COLORS=['#235fe4','#d2435a','#2f9d77','#b4781f','#7446c4','#0c8ba5','#c05b9e','#65707e'];
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(t){$('toast').textContent=t;$('toast').style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').style.display='none',4000)}
+async function api(url,method='GET',data){const r=await fetch(url,{method,headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const d=await r.json().catch(()=>({error:'服务未返回数据'}));if(!r.ok)throw Error(d.error||'请求失败');return d}
+async function safely(fn){try{await fn()}catch(e){toast(e.message)}}
+const endpoint=()=>'/chart/api/projects/'+S.p.id;
+const panel=()=>S.p?.panels.find(x=>x.id===S.pid)||S.p?.panels[0];
+const pindex=()=>S.p?S.p.panels.findIndex(x=>x.id===panel()?.id):-1;
+const series=()=>{const pn=panel();return pn?.series.find(s=>s.id===S.sid)||pn?.series[0]};
+const colorOf=(pn,i)=>pn.series[i]?('#'+pn.series[i].settings.color.map(v=>Math.round(v).toString(16).padStart(2,'0')).join('')):COLORS[i%COLORS.length];
+const hex=c=>{const m=String(c).match(/[0-9a-f]{2}/gi);return m&&m.length>=3?m.slice(-3).map(v=>parseInt(v,16)):[35,100,210]};
+
+async function list(){const a=await api('/chart/api/projects');$('projects').replaceChildren(...a.map(x=>{
+  const b=document.createElement('button');b.innerHTML=`${esc(x.name)}<small style="display:block;color:#8b98aa;font-weight:400">${x.panels} 个面板 · ${x.series} 条曲线</small>`;
+  b.onclick=()=>safely(()=>open(x.id));return b}))}
+
+async function open(id){
+  S.p=await api('/chart/api/projects/'+id);S.pid=S.p.active_panel||S.p.panels[0]?.id;
+  S.sid=panel()?.series[0]?.id||null;S.result=null;S.dirty=false;
+  S.source.src=endpoint()+'/source.png?v='+S.p.revision;
+  S.source.onload=()=>{const rid=preferredResult();if(rid)loadResult(rid);else{S.overlay=new Image();draw()}};
+  render();
+}
+
+function viewWidth(){const pn=panel();return S.view==='panel'&&pn?pn.region.w:S.source.naturalWidth}
+function fitScale(){if(!S.p||!S.source.naturalWidth)return 1;const stage=$('canvas').parentElement;const avail=stage.clientWidth-36;const width=viewWidth();const cap=S.view==='panel'?2.5:1;return Math.min(cap,Math.max(.15,avail/width))}
+
+function draw(){
+  if(!S.p||!S.source.naturalWidth)return;
+  const cv=$('canvas');cv.hidden=false;$('empty').hidden=true;
+  const pn=panel(),single=S.view==='panel'&&pn;
+  const x0=single?pn.region.x:0,y0=single?pn.region.y:0;
+  const w=single?pn.region.w:S.source.naturalWidth,h=single?pn.region.h:S.source.naturalHeight;
+  const scale=fitScale();cv.width=Math.max(1,Math.round(w*scale));cv.height=Math.max(1,Math.round(h*scale));
+  const k=cv.width/w;
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
+  const showOver=S.showOverlay&&S.result&&S.overlay.complete&&S.overlay.naturalWidth;
+  ctx.drawImage(showOver?S.overlay:S.source,x0,y0,w,h,0,0,cv.width,cv.height);
+  ctx.lineWidth=1.6;
+  for(const [i,x] of (S.p?.panels||[]).entries()){
+    const r=x.region,active=x.id===pn?.id,state=x.anchor_status;
+    const border=active?'#235fe4':'#7d8ba1';
+    if(S.view==='all'){
+      ctx.strokeStyle=border;ctx.setLineDash(active?[]:[5,4]);
+      ctx.strokeRect(r.x*k+.5,r.y*k+.5,r.w*k-1,r.h*k-1);ctx.setLineDash([]);
+      ctx.fillStyle=active?'#235fe4':'#6d7c92';ctx.font='600 12px system-ui';
+      ctx.fillText(x.name,r.x*k+5,r.y*k-5);
+      if(state&&(state.outside||state.overlap)){ctx.fillStyle='#96631a';ctx.font='11px system-ui';
+        ctx.fillText(`校对点 适用${state.inside} · 重叠${state.overlap} · 面板外${state.outside}`,r.x*k+5,r.y*k+11)}
+    }else if(S.view==='panel'){
+      ctx.strokeStyle='#d6dfec';ctx.strokeRect(.5,.5,cv.width-1,cv.height-1);
+      if(x.id!==pn.id&&overlaps(x.region,pn.region)){ctx.strokeStyle='#96631a';ctx.setLineDash([4,4]);
+        ctx.strokeRect((x.region.x-pn.region.x)*k+.5,(x.region.y-pn.region.y)*k+.5,x.region.w*k,x.region.h*k);ctx.setLineDash([])}
+    }
+  }
+  if(S.view==='panel'&&pn){
+    const c=pn.calibration;ctx.strokeStyle='#f79a26';ctx.lineWidth=2;ctx.beginPath();
+    ['x_end','origin','y_end'].forEach((key,i)=>{const a=c[key];const px=(a[0]-x0)*k,py=(a[1]-y0)*k;i?ctx.lineTo(px,py):ctx.moveTo(px,py)});
+    ctx.stroke();
+  }
+  for(const s of (pn?.series||[])){
+    const chosen=s.id===series()?.id;
+    for(const a of s.anchors){
+      const ax=(a.pixel[0]-x0)*k,ay=(a.pixel[1]-y0)*k;
+      if(ax<0||ay<0||ax>cv.width||ay>cv.height)continue;
+      const state=a.state||'inside';
+      ctx.fillStyle=state==='inside'?'#aa44dd':state==='overlap'?'#c48b28':'#98a3b3';
+      ctx.beginPath();ctx.arc(ax,ay,chosen?4.5:3.2,0,Math.PI*2);ctx.fill();
+      if(state!=='inside'){ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(ax,ay,8,0,Math.PI*2);ctx.stroke()}
+    }
+  }
+  S.k=k;S.origin=[x0,y0];
+}
+function overlaps(a,b){return a.x<b.x+b.w&&b.x<a.x+a.w&&a.y<b.y+b.h&&b.y<a.y+a.h}
+
+function render(){
+  if(!S.p)return;
+  const pn=panel();S.pid=pn?.id;
+  $('title').textContent=S.p.name;
+  const states=S.p.panels.map(x=>x.anchor_status||{});
+  $('revision').textContent=`REV ${S.p.revision} · ${S.p.panels.length} 个面板 · ${S.p.panels.reduce((a,x)=>a+x.series.length,0)} 条曲线 · 校对点固定在源图像素`;
+  $('panelCount').textContent=S.p.panels.length;
+  $('panelSelect').replaceChildren(...S.p.panels.map(x=>{const o=document.createElement('option');o.value=x.id;
+    const st=x.anchor_status||{};o.textContent=`${x.name} · ${x.series.length} 曲线`+(st.outside?` · ${st.outside} 点不适用`:'');return o}));
+  $('panelSelect').value=S.pid;
+  if(!pn?.series.some(s=>s.id===S.sid))S.sid=pn?.series[0]?.id||null;
+  $('series').replaceChildren(...(pn?.series||[]).map(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.name;return o}));
+  if(S.sid)$('series').value=S.sid;
+  for(const a of ['x','y']){const c=pn?.calibration[a];if(!c)continue;$(a+'min').value=c.min;$(a+'max').value=c.max;$(a+'scale').value=c.scale}
+  if(pn){$('r_x').value=pn.region.x;$('r_y').value=pn.region.y;$('r_w').value=pn.region.w;$('r_h').value=pn.region.h;$('overlap').value=pn.overlap||'exclude'}
+  $('coords').replaceChildren(...['origin','x_end','y_end'].map(key=>{const l=document.createElement('label');l.className='field';
+    l.textContent={origin:'原点',x_end:'X端点',y_end:'Y端点'}[key];const i=document.createElement('input');i.id='pt_'+key;
+    i.value=(pn?.calibration[key]||[0,0]).join(', ');l.append(i);return l}));
+  const st=pn?.anchor_status||{inside:0,overlap:0,outside:0};
+  $('applicable').innerHTML=`本面板校对点：<b>${st.inside}</b> 个适用`+(st.overlap?` · <b>${st.overlap}</b> 个落在重叠区（不取样）`:'')+(st.outside?` · <b>${st.outside}</b> 个在面板外`:'');
+  const shared=S.p.panels.filter(x=>x.id!==pn?.id&&overlaps(x.region,pn.region));
+  $('overlapNote').textContent=shared.length?`与 ${shared.map(x=>x.name).join('、')} 的矩形重叠。重叠像素按下方策略处理，曲线证据不会跨面板。`:'与其他面板没有重叠区域。';
+  const s=series();$('settings').innerHTML='';
+  if(s){$('color').value=colorOf(pn,pn.series.indexOf(s));
+    for(const [key,label] of Object.entries({tolerance:'颜色容差',smoothness:'连续性约束',max_step:'相邻列最大步长',gap_limit:'允许短缺口列数',min_confidence:'最低颜色置信度',width:'追踪横向分辨率',height:'追踪纵向分辨率',samples:'导出采样数量'})){
+      const l=document.createElement('label');l.className='field';l.textContent=label;const i=document.createElement('input');
+      i.id='s_'+key;i.type='number';i.step=['tolerance','smoothness','min_confidence'].includes(key)?'any':'1';i.value=s.settings[key];l.append(i);$('settings').append(l)}}
+  $('versions').replaceChildren(...(S.p.versions||[]).slice().reverse().map(v=>{const b=document.createElement('button');
+    const names=(v.panels||[]).map(x=>x.name).join('、');
+    b.innerHTML=`↺ ${esc(v.label)}<small style="display:block;color:#8b98aa;font-weight:400">${esc(names||'整幅图')} · ${(v.panels||[]).length||1} 面板</small>`;
+    b.onclick=()=>safely(async()=>{const updated=await api(endpoint()+'/versions/'+v.id+'/restore','POST',{revision:S.p.revision});
+      S.p=updated;S.pid=S.p.active_panel;S.sid=panel()?.series[0]?.id||null;S.result=null;
+      // A restored calibration usually makes an older extraction applicable
+      // again; show it instead of an empty table.
+      const rid=preferredResult();
+      if(rid)await loadResult(rid);
+      render();await list()});return b}));
+  $('history').replaceChildren(...(S.p.results||[]).slice().reverse().map(r=>{const b=document.createElement('button');
+    const statesOf=(r.panel_states||[]).map(x=>`${x.name}:${{fresh:'仍适用',stale:'标定已变',orphan:'面板已删'}[x.state]||x.state}`).join(' · ');
+    b.innerHTML=`◷ REV ${r.revision} <span class="pill ${r.state==='fresh'?'ok':r.state==='legacy'?'':'stale'}">${{fresh:'全部适用',mixed:'部分变化',legacy:'旧单面板',stale:'需重提'}[r.state]||r.state}</span><small style="display:block;color:#8b98aa;font-weight:400">${esc(statesOf||'旧结果')}</small>`;
+    b.onclick=()=>safely(()=>loadResult(r.id));return b}));
+  if(!$('history').children.length)$('history').innerHTML='<p class="hint">还没有提取结果。</p>';
+  $('downloads').replaceChildren();
+  $('resultState').textContent=S.result?`当前显示 REV ${S.result.revision} 的提取结果。`:'尚未提取；修改面板或标定后需重新提取。';
+  if(!S.result){$('rows').textContent='—';$('quality').textContent='—';$('runs').textContent='—';$('data').replaceChildren()}
+  else showResult();
+  draw();
+}
+
+async function mutate(url,method,data){
+  const keepResult=S.result?S.result.id:null;
+  S.p=await api(url,method,{...data,revision:S.p.revision});S.dirty=true;
+  // Keep showing the last extraction (its values are frozen), but refresh its
+  // freshness tags now that panel geometry or calibration may have changed.
+  if(keepResult){try{S.result=await api(endpoint()+'/results/'+keepResult)}catch(e){S.result=null}}
+  render();await list()}
+
+async function loadResult(rid){
+  S.result=await api(endpoint()+'/results/'+rid);
+  S.overlay=new Image();S.overlay.onload=draw;S.overlay.src=endpoint()+'/results/'+rid+'/overlay.png';
+  showResult();render();
+}
+function preferredResult(){
+  if(S.p?.current_result)return S.p.current_result;
+  const fresh=(S.p?.results||[]).filter(r=>r.state==='fresh'||r.state==='legacy');
+  return fresh.length?fresh[fresh.length-1].id:null;
+}
+function refreshResultNote(){
+  const r=S.result;if(!r)return;
+  $('resultState').textContent=r.state==='fresh'?'该结果与当前各面板标定一致。'
+    :r.state==='legacy'?'旧单面板结果，按当时的整幅图标定保存；可直接下载。'
+    :'该结果的某些面板标定已改变，下载内容仍是提取当时的值。';
+}
+function showResult(){
+  const r=S.result;if(!r)return;
+  const pn=panel();
+  let rows=r.series||[];
+  if(S.rowsTab==='current')rows=rows.filter(x=>x.panel===pn?.id);
+  $('rows').textContent=rows.reduce((a,x)=>a+x.rows.length,0);
+  const conf=rows.flatMap(x=>x.rows.map(row=>row.confidence));
+  $('quality').textContent=conf.length?(100*conf.reduce((a,b)=>a+b,0)/conf.length).toFixed(1)+'%':'—';
+  $('runs').textContent=rows.reduce((a,x)=>a+x.paths.length,0);
+  $('data').replaceChildren(...rows.flatMap(s=>s.rows.slice(0,60).map(row=>{const tr=document.createElement('tr');
+    for(const v of [s.panel_name||s.name,s.name,row.x.toPrecision(6),row.y.toPrecision(6),row.confidence.toFixed(3)]){
+      const td=document.createElement('td');td.textContent=v;tr.append(td)}return tr})));
+  const rid=r.id;
+  $('downloads').replaceChildren(...[['data.csv','↓ 全部面板 CSV'],['bundle.zip','↓ 各面板 CSV + 叠加图 ZIP'],['overlay.png','↓ 叠加图 PNG']].map(([file,label])=>{
+    const a=document.createElement('a');a.href=endpoint()+'/results/'+rid+'/'+file;a.textContent=label;
+    if(file==='bundle.zip')a.className='badge';return a}));
+  refreshResultNote();
+}
+function setView(view){
+  S.view=view;$('viewAll').classList.toggle('selected',view==='all');$('viewPanel').classList.toggle('selected',view==='panel');
+  $('viewHint').textContent=view==='all'?'总览：查看或拖动面板矩形':'单面板：在本面板内点标定点、吸取颜色';
+  draw();
+}
+function setTab(tab){S.tab=tab;for(const k of ['panel','calib','track']){$('tab'+k[0].toUpperCase()+k.slice(1)).classList.toggle('selected',k===tab);$('pane'+k[0].toUpperCase()+k.slice(1)).hidden=k!==tab}}
+
+function switchPanel(pid){const old=panel();const oldS=S.sid;S.pid=pid;const pn=panel();
+  if(pn&&oldS&&old?.series.some(s=>s.id===oldS))S.sid=oldS;else S.sid=pn?.series[0]?.id||null;
+  if(pn&&S.p.active_panel!==pid)S.p.active_panel=pid;render()}
+
+function pickPoint(e){
+  const cv=$('canvas'),r=cv.getBoundingClientRect();
+  const x=(e.clientX-r.left)*cv.width/r.width/S.k+(S.origin?S.origin[0]:0);
+  const y=(e.clientY-r.top)*cv.height/r.height/S.k+(S.origin?S.origin[1]:0);
+  return [x,y];
+}
+
+$('canvas').onmousedown=e=>{if(!S.p)return;
+  if(S.view==='all'&&S.mode==='inspect'){
+    const pt=pickPoint(e);const hit=S.p.panels.slice().reverse().find(x=>pt[0]>=x.region.x&&pt[0]<=x.region.x+x.region.w&&pt[1]>=x.region.y&&pt[1]<=x.region.y+x.region.h);
+    if(hit&&hit.id!==panel()?.id){switchPanel(hit.id)}
+    if(hit){S.drag={id:hit.id,start:pt,region:{...hit.region},moved:false};$('canvas').style.cursor='grabbing'}
+    return;
+  }
+  if(S.view==='all'&&S.mode!=='inspect'){
+    const pt=pickPoint(e);const hit=S.p.panels.slice().reverse().find(x=>pt[0]>=x.region.x&&pt[0]<=x.region.x+x.region.w&&pt[1]>=x.region.y&&pt[1]<=x.region.y+x.region.h);
+    if(!hit)return toast('请先在总览里点选一个面板，再到单面板操作');
+    switchPanel(hit.id);setView('panel');return;
+  }
+  safely(()=>handlePoint(pickPoint(e)));
+};
+$('canvas').onmousemove=e=>{if(!S.drag)return;const pt=pickPoint(e);S.drag.moved=true;
+  const dx=Math.round(pt[0]-S.drag.start[0]),dy=Math.round(pt[1]-S.drag.start[1]);
+  const pn=S.p.panels.find(x=>x.id===S.drag.id);if(!pn)return;
+  pn.region={x:Math.max(0,Math.min(S.source.naturalWidth-pn.region.w,S.drag.region.x+dx)),
+             y:Math.max(0,Math.min(S.source.naturalHeight-pn.region.h,S.drag.region.y+dy)),
+             w:S.drag.region.w,h:S.drag.region.h};
+  draw()};
+window.addEventListener('mouseup',()=>{const d=S.drag;S.drag=null;$('canvas').style.cursor='crosshair';
+  if(!d||!d.moved)return;const pn=S.p.panels.find(x=>x.id===d.id);if(!pn)return;
+  safely(()=>mutate(endpoint()+'/panels/'+pn.id,'PATCH',{region:pn.region}))});
+
+async function handlePoint(pt){
+  const pn=panel();if(!pn)return;
+  if(['origin','x_end','y_end'].includes(S.mode)){
+    if(S.view!=='panel'){setView('panel')}
+    await mutate(endpoint()+'/panels/'+pn.id,'PATCH',{calibration:{...pn.calibration,[S.mode]:pt.map(v=>+v.toFixed(2))}});
+    return $('status').textContent=`${pn.name} 标定点已更新`}
+  if(S.mode==='anchor'&&series()){
+    await mutate(endpoint()+'/series/'+S.sid,'PATCH',{panel:S.pid,anchors:[...series().anchors,{pixel:pt.map(v=>+v.toFixed(2))}]});
+    return $('status').textContent='已添加校对点（固定在源图像素）'}
+  if(S.mode==='color'&&series()){
+    const c=document.createElement('canvas');c.width=S.source.naturalWidth;c.height=S.source.naturalHeight;
+    const g=c.getContext('2d');g.drawImage(S.source,0,0);
+    const color=Array.from(g.getImageData(Math.round(pt[0]),Math.round(pt[1]),1,1).data).slice(0,3);
+    await mutate(endpoint()+'/series/'+S.sid,'PATCH',{panel:S.pid,settings:{color}});
+    return $('status').textContent='已吸取颜色 '+color.join(',')}
+  $('status').textContent=`${pn.name} 像素 ${pt.map(v=>v.toFixed(1)).join(', ')}`;
+}
+
+$('create').onclick=()=>safely(async()=>{const p=await api('/chart/api/projects','POST',{panels:true,name:'多面板示范'});await list();await open(p.id)});
+$('createSingle').onclick=()=>safely(async()=>{const p=await api('/chart/api/projects','POST',{name:'合成图表示范'});await list();await open(p.id)});
+$('viewAll').onclick=()=>setView('all');$('viewPanel').onclick=()=>setView('panel');
+$('tabPanel').onclick=()=>setTab('panel');$('tabCalib').onclick=()=>setTab('calib');$('tabTrack').onclick=()=>setTab('track');
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.mode;
+  document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('selected',x===b));
+  if(['origin','x_end','y_end'].includes(S.mode)&&S.view!=='panel')setView('panel');
+  $('status').textContent='当前操作：'+b.textContent});
+$('panelSelect').onchange=()=>switchPanel($('panelSelect').value);
+$('series').onchange=()=>{S.sid=$('series').value;render()};
+$('tabCurrent').onclick=()=>{S.rowsTab='current';$('tabCurrent').classList.add('selected');$('tabAll').classList.remove('selected');showResult()};
+$('tabAll').onclick=()=>{S.rowsTab='all';$('tabAll').classList.add('selected');$('tabCurrent').classList.remove('selected');showResult()};
+$('toggle').onclick=()=>{S.showOverlay=!S.showOverlay;draw()};
+$('rename').onclick=()=>safely(async()=>{const name=prompt('工程名称',S.p.name);if(name)await mutate(endpoint(),'PATCH',{name})});
+$('addPanel').onclick=()=>safely(async()=>{
+  const w=S.source.naturalWidth,h=S.source.naturalHeight;const offset=20*S.p.panels.length;
+  const region={x:Math.min(w-64,40+offset),y:Math.min(h-64,40+offset),w:Math.max(120,Math.round(w*.42)),h:Math.max(120,Math.round(h*.6))};
+  const name=prompt('新面板名称','面板 '+(S.p.panels.length+1));if(!name)return;
+  await mutate(endpoint()+'/panels','POST',{name,region});
+  S.pid=S.p.active_panel||S.p.panels[S.p.panels.length-1].id;S.sid=null;render();setView('panel')});
+$('renamePanel').onclick=()=>safely(async()=>{const name=prompt('面板名称',panel().name);if(name)await mutate(endpoint()+'/panels/'+panel().id,'PATCH',{name})});
+$('deletePanel').onclick=()=>safely(async()=>{if(S.p.panels.length<=1)return toast('至少保留一个面板');
+  if(!confirm('删除面板 '+panel().name+' 及其曲线？历史结果仍可下载。'))return;
+  await mutate(endpoint()+'/panels/'+panel().id,'DELETE',{});S.pid=S.p.active_panel||S.p.panels[0].id;S.sid=panel()?.series[0]?.id||null;render()});
+$('saveRegion').onclick=()=>safely(()=>mutate(endpoint()+'/panels/'+panel().id,'PATCH',{region:{x:+$('r_x').value,y:+$('r_y').value,w:+$('r_w').value,h:+$('r_h').value}}));
+$('overlap').onchange=()=>safely(()=>mutate(endpoint()+'/panels/'+panel().id,'PATCH',{overlap:$('overlap').value}));
+$('calibrate').onclick=()=>safely(async()=>{const c=structuredClone(panel().calibration);
+  for(const a of ['x','y'])c[a]={min:Number($(a+'min').value),max:Number($(a+'max').value),scale:$(a+'scale').value};
+  await mutate(endpoint()+'/panels/'+panel().id,'PATCH',{calibration:c})});
+$('calibrateRegion').onclick=()=>safely(()=>{const pn=panel();const r=pn.region;const c=structuredClone(pn.calibration);
+  c.origin=[r.x,r.y+r.h];c.x_end=[r.x+r.w,r.y+r.h];c.y_end=[r.x,r.y];
+  return mutate(endpoint()+'/panels/'+pn.id,'PATCH',{calibration:c})});
+$('exact').onclick=()=>safely(()=>{const c=structuredClone(panel().calibration);
+  for(const key of ['origin','x_end','y_end'])c[key]=$('pt_'+key).value.split(',').map(Number);
+  return mutate(endpoint()+'/panels/'+panel().id,'PATCH',{calibration:c})});
+$('add').onclick=()=>safely(async()=>{const name=prompt('曲线名称','新曲线');if(name)await mutate(endpoint()+'/series','POST',{name,panel:S.pid})});
+$('delete').onclick=()=>safely(()=>mutate(endpoint()+'/series/'+S.sid,'DELETE',{panel:S.pid}));
+$('clear').onclick=()=>safely(()=>mutate(endpoint()+'/series/'+S.sid,'PATCH',{panel:S.pid,anchors:[]}));
+$('extract').onclick=()=>safely(async()=>{
+  const s=series();if(!s)return $('status').textContent='当前面板没有曲线';
+  const values={};for(const key of Object.keys(s.settings))if(key!=='color')values[key]=Number($('s_'+key).value);
+  values.color=hex($('color').value);
+  $('extract').disabled=true;
+  try{await mutate(endpoint()+'/series/'+S.sid,'PATCH',{panel:S.pid,settings:values});
+    $('status').textContent='正在按各面板区域追踪…';S.result=await api(endpoint()+'/extract','POST',{});
+    S.p=await api(endpoint());await loadResult(S.result.id);
+    $('status').textContent=`已提取 ${S.result.panels.length} 个面板`}finally{$('extract').disabled=false}});
+$('snapshot').onclick=()=>safely(async()=>{const label=prompt('版本名称','校对前');if(!label)return;
+  S.p=await api(endpoint()+'/versions','POST',{revision:S.p.revision,label});render()});
+$('upload').onchange=()=>safely(async()=>{
+  const form=new FormData();form.append('revision',S.p.revision);form.append('file',$('upload').files[0]);
+  const r=await fetch(endpoint()+'/source',{method:'POST',body:form});const d=await r.json();
+  if(!r.ok)throw Error(d.error);await open(d.id)});
+safely(list);
+{% endraw %}
 </script></body></html>
