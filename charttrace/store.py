@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from image_lab.validation import Invalid, Conflict
 from .coordinates import default_calibration, validate, finite
+from .scatter import scatter_defaults, detect_points, new_id
 
 
 def identifier():
@@ -37,7 +38,7 @@ def encode(image):
 
 
 def defaults():
-    return {'color':[35,100,210],'tolerance':24.,'width':480,'height':320,
+    return {'kind':'curve','color':[35,100,210],'tolerance':24.,'width':480,'height':320,
             'max_step':20,'smoothness':2.,'min_confidence':.25,'gap_limit':8,'samples':100}
 
 
@@ -56,6 +57,72 @@ def settings(value):
         raise Invalid('颜色需要三个0–255通道')
     s['color']=color.tolist()
     return s
+
+
+def scatter_settings(value):
+    s={**scatter_defaults(),**(value or {})}
+    if s['kind']!='scatter':
+        raise Invalid('散点系列类型无效')
+    for key,lower,upper in [('point_min',3,200),('point_max',3,400)]:
+        if not isinstance(s[key],(int,float)) or not lower<=s[key]<=upper:
+            raise Invalid(key+' 超出范围')
+        s[key]=float(s[key])
+    if s['point_min']>s['point_max']:
+        raise Invalid('点尺寸范围无效：最小不能大于最大')
+    for key,lower,upper in [('tolerance',1,100),('min_confidence',.01,.99)]:
+        s[key]=float(finite(s[key],key))
+        if not lower<=s[key]<=upper:
+            raise Invalid(key+' 超出范围')
+    color=finite(s['color'],'颜色')
+    if color.shape!=(3,) or color.min()<0 or color.max()>255:
+        raise Invalid('颜色需要三个0–255通道')
+    s['color']=color.tolist()
+    return s
+
+
+def check_points(value, image_shape):
+    if not isinstance(value,list) or len(value)>500:
+        raise Invalid('散点最多500个')
+    points=[]
+    height,width=image_shape[:2]
+    for item in value:
+        if not isinstance(item,dict):
+            raise Invalid('散点格式无效')
+        point=finite(item.get('pixel'),'散点')
+        if point.shape!=(2,):
+            raise Invalid('散点需要两个像素坐标')
+        if not(-50<=point[0]<=width+50 and -50<=point[1]<=height+50):
+            raise Invalid('散点超出源图范围')
+        radius=item.get('radius',6.)
+        if not isinstance(radius,(int,float)) or not 0.5<=float(radius)<=200:
+            raise Invalid('点半径无效')
+        confidence=item.get('confidence',0.)
+        if not isinstance(confidence,(int,float)) or not 0<=float(confidence)<=1:
+            raise Invalid('点置信度无效')
+        source=item.get('source','manual')
+        if source not in ('auto','manual'):
+            raise Invalid('点来源无效')
+        points.append({'id':str(item.get('id') or new_id())[:24],
+                       'pixel':point.tolist(),'radius':float(radius),
+                       'confidence':float(confidence),'source':source})
+    return points
+
+
+def check_exclusions(value, image_shape):
+    if not isinstance(value,list) or len(value)>50:
+        raise Invalid('排除区最多50个')
+    height,width=image_shape[:2]
+    result=[]
+    for item in value:
+        if not isinstance(item,dict) or not isinstance(item.get('rect'),list) or len(item['rect'])!=4:
+            raise Invalid('排除区需要 x,y,宽,高 四个数')
+        rect=finite(item['rect'],'排除区')
+        x,y,w,h=rect.tolist()
+        if w<=0 or h<=0 or x+w<0 or y+h<0 or x>width or y>height:
+            raise Invalid('排除区超出源图范围')
+        result.append({'id':str(item.get('id') or new_id())[:24],
+                       'rect':[x,y,float(w),float(h)]})
+    return result
 
 
 class Store:
@@ -119,6 +186,8 @@ class Store:
             p['calibration']=default_calibration(image.shape[1],image.shape[0])
             for series in p['series']:
                 series['anchors']=[]
+                series['points']=[]
+                series['exclusions']=[]
         return self.mutate(key,expected,operation)
 
     def update(self,key,expected,data):
@@ -129,20 +198,31 @@ class Store:
                 p['calibration']=validate(data['calibration'])
         return self.mutate(key,expected,operation)
 
-    def add_series(self,key,expected,name):
+    def add_series(self,key,expected,name,kind='curve'):
         def operation(p):
             if len(p['series'])>=8:
                 raise Invalid('最多8条曲线')
-            p['series'].append({'id':identifier(),'name':str(name)[:80],
-                                'settings':defaults(),'anchors':[]})
+            if kind=='scatter':
+                p['series'].append({'id':identifier(),'name':str(name)[:80],
+                                    'settings':scatter_defaults(),'anchors':[],
+                                    'points':[],'exclusions':[]})
+            elif kind=='curve':
+                p['series'].append({'id':identifier(),'name':str(name)[:80],
+                                    'settings':defaults(),'anchors':[]})
+            else:
+                raise Invalid('采集类型无效')
         return self.mutate(key,expected,operation)
 
-    def edit_series(self,key,expected,sid,data):
+    def edit_series(self,key,expected,sid,data,image_shape=None):
         def operation(p):
             s=next((x for x in p['series'] if x['id']==sid),None)
             if s is None:
                 raise Invalid('曲线不存在')
-            if 'settings' in data:
+            kind=s['settings'].get('kind','curve')
+            if kind=='scatter':
+                if 'settings' in data:
+                    s['settings']=scatter_settings({**s['settings'],**data['settings']})
+            elif 'settings' in data:
                 s['settings']=settings({**s['settings'],**data['settings']})
             if 'name' in data:
                 s['name']=str(data['name'])[:80]
@@ -156,6 +236,16 @@ class Store:
                         raise Invalid('手动点需要两个像素坐标')
                     anchors.append({'id':item.get('id',identifier()),'pixel':point.tolist()})
                 s['anchors']=anchors
+            if kind=='scatter':
+                shape=image_shape or self.source(p).shape
+                if 'points' in data:
+                    s['points']=check_points(data['points'],shape)
+                elif 'points' not in s:
+                    s['points']=[]
+                if 'exclusions' in data:
+                    s['exclusions']=check_exclusions(data['exclusions'],shape)
+                elif 'exclusions' not in s:
+                    s['exclusions']=[]
         return self.mutate(key,expected,operation)
 
     def delete_series(self,key,expected,sid):
@@ -168,6 +258,36 @@ class Store:
         with self.lock:
             p=self.read(key)
             return copy.deepcopy(p),self.source(p)
+
+    def detect(self,key,expected,sid,roi):
+        """Run marker detection; proofread points are stored in source pixels."""
+        with self.lock:
+            p=self.read(key)
+            self.revision(p,expected)
+            series=next((x for x in p['series'] if x['id']==sid),None)
+            if series is None:
+                raise Invalid('曲线不存在')
+            if series['settings'].get('kind')!='scatter':
+                raise Invalid('当前不是散点系列')
+            image=self.source(p)
+            found=detect_points(image,series['settings'],series.get('exclusions',[]),roi)
+            current=series.get('points',[])
+            if roi is None:
+                merged=found
+            else:
+                # ROI detection only re-interprets the box: every old point
+                # inside the box is removed before NMS so a merged blob can
+                # legitimately split into several new markers.
+                rx,ry,rw,rh=roi
+                def inside(q):
+                    return rx-1<=q['pixel'][0]<=rx+rw+1 and ry-1<=q['pixel'][1]<=ry+rh+1
+                outside=[q for q in current if not inside(q)]
+                merged=outside+found
+            series['points']=check_points(merged,image.shape)
+            p['revision']+=1
+            p['current_result']=None
+            self.write(p)
+            return copy.deepcopy(p),copy.deepcopy(series['points'])
 
     def snapshot(self,key,expected,label):
         with self.lock:

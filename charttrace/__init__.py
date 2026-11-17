@@ -23,6 +23,10 @@ def install(app,root):
         p=store.update(p['id'],p['revision'],{'calibration':{'origin':[100,460],'x_end':[760,460],
             'y_end':[100,65],'x':{'min':0,'max':10,'scale':'linear'},
             'y':{'min':0,'max':100,'scale':'linear'}}})
+        p=store.add_series(p['id'],p['revision'],'红色散点','scatter')
+        scatter=next(s for s in p['series'] if s['settings'].get('kind')=='scatter')
+        p=store.edit_series(p['id'],p['revision'],scatter['id'],
+                            {'exclusions':[{'rect':[558,26,164,34]}]})
         return jsonify(p)
 
     @app.get('/chart/api/projects/<key>')
@@ -45,7 +49,11 @@ def install(app,root):
     @app.post('/chart/api/projects/<key>/series')
     def add(key):
         d=request.get_json()
-        return jsonify(store.add_series(key,d['revision'],d.get('name','新曲线')))
+        kind=d.get('kind','curve')
+        if kind not in ('curve','scatter'):
+            raise Invalid('采集类型无效')
+        default_name='新散点' if kind=='scatter' else '新曲线'
+        return jsonify(store.add_series(key,d['revision'],d.get('name',default_name),kind))
 
     @app.patch('/chart/api/projects/<key>/series/<sid>')
     def edit(key,sid):
@@ -56,6 +64,16 @@ def install(app,root):
     def remove(key,sid):
         d=request.get_json()
         return jsonify(store.delete_series(key,d['revision'],sid))
+
+    @app.post('/chart/api/projects/<key>/series/<sid>/detect')
+    def detect(key,sid):
+        d=request.get_json()
+        roi=d.get('roi')
+        if roi is not None:
+            if not isinstance(roi,list) or len(roi)!=4 or any(not isinstance(v,(int,float)) for v in roi):
+                raise Invalid('框选区域需要 x,y,宽,高 四个数')
+        p,points=store.detect(key,d['revision'],sid,roi)
+        return jsonify({'project':p,'points':points})
 
     @app.post('/chart/api/projects/<key>/versions')
     def snapshot(key):
