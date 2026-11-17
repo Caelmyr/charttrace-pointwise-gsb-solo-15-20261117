@@ -3,6 +3,7 @@ from flask import jsonify,render_template,request,send_file,redirect
 from image_lab.validation import Invalid
 from .store import Store,decode,encode
 from .delivery import demo,extract,csv_bytes,bundle
+from .intersections import measure,measurement_csv
 
 
 def install(app,root):
@@ -88,3 +89,22 @@ def install(app,root):
         if artifact=='bundle.zip':
             return send_file(io.BytesIO(bundle(record,folder)),mimetype='application/zip',as_attachment=True,download_name='chart-extraction.zip')
         raise Invalid('文件不存在')
+
+    def _measurement(key,rid):
+        record,_=store.result(key,None if rid=='current' else rid)
+        a=request.args.get('series_a','')
+        b=request.args.get('series_b','')
+        tol=request.args.get('tolerance','3')
+        return record,measure(record,a,b,tol)
+
+    @app.get('/chart/api/projects/<key>/results/<rid>/intersections')
+    def intersections(key,rid):
+        _,payload=_measurement(key,rid)
+        return jsonify(payload)
+
+    @app.get('/chart/api/projects/<key>/results/<rid>/intersections.csv')
+    def intersections_csv(key,rid):
+        record,payload=_measurement(key,rid)
+        name='intersections-'+str(record['revision'])+'.csv'
+        return send_file(io.BytesIO(measurement_csv(payload)),mimetype='text/csv',
+                         as_attachment=True,download_name=name)
