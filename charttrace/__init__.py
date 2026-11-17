@@ -1,8 +1,9 @@
 import io
-from flask import jsonify,render_template,request,send_file,redirect
+from flask import jsonify,render_template,request,send_file
 from image_lab.validation import Invalid
 from .store import Store,decode,encode
 from .delivery import demo,extract,csv_bytes,bundle
+from .portable import build_package,read_package,install_package
 
 
 def install(app,root):
@@ -87,4 +88,30 @@ def install(app,root):
             return send_file(io.BytesIO(csv_bytes(record['series'])),mimetype='text/csv',as_attachment=True,download_name='chart-data.csv')
         if artifact=='bundle.zip':
             return send_file(io.BytesIO(bundle(record,folder)),mimetype='application/zip',as_attachment=True,download_name='chart-extraction.zip')
+        if artifact=='editable.zip':
+            raw=build_package(store,key,None if rid=='current' else rid)
+            return send_file(io.BytesIO(raw),mimetype='application/zip',as_attachment=True,
+                             download_name='chart-editable.zip')
         raise Invalid('文件不存在')
+
+    @app.post('/chart/api/projects/<key>/editable')
+    def editable(key):
+        data=request.get_json(silent=True) or {}
+        if not isinstance(data,dict):
+            raise Invalid('导出参数无效')
+        result=data.get('result','current')
+        if result is None:
+            result='working'
+        if not isinstance(result,str):
+            raise Invalid('导出结果无效')
+        raw=build_package(store,key,result,data.get('versions',[]))
+        return send_file(io.BytesIO(raw),mimetype='application/zip',as_attachment=True,
+                         download_name='chart-editable.zip')
+
+    @app.post('/chart/api/import')
+    def import_package():
+        file=request.files.get('file')
+        if file is None:
+            raise Invalid('请选择可编辑包')
+        package=read_package(file.read())
+        return jsonify(install_package(store,package)),201

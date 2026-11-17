@@ -87,6 +87,20 @@ class Store:
                  'series':len(p['series']),'current_result':p['current_result']}
                 for p in [json.loads(f.read_text()) for f in self.root.glob('*/project.json')]]
 
+    def unique_name(self, name):
+        """Return a project name that does not collide with any local project."""
+        base=str(name)[:100].strip() or '导入的图表工程'
+        existing={p['name'] for p in [json.loads(f.read_text()) for f in self.root.glob('*/project.json')]}
+        if base not in existing:
+            return base
+        index=2
+        while True:
+            suffix='（导入 '+str(index)+'）'
+            candidate=(base[:100-len(suffix)]+suffix).strip()
+            if candidate not in existing:
+                return candidate
+            index+=1
+
     def create(self,name,image):
         with self.lock:
             p={'id':identifier(),'name':str(name)[:100],'revision':1,'created':time.time(),
