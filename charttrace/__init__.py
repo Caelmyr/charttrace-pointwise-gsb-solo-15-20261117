@@ -2,7 +2,8 @@ import io
 from flask import jsonify,render_template,request,send_file,redirect
 from image_lab.validation import Invalid
 from .store import Store,decode,encode
-from .delivery import demo,extract,csv_bytes,bundle
+from .delivery import demo,demo_bars,extract,csv_bytes,bundle
+from .bars import bars_csv_bytes
 
 
 def install(app,root):
@@ -19,7 +20,12 @@ def install(app,root):
 
     @app.post('/chart/api/projects')
     def create():
-        p=store.create((request.get_json(silent=True) or {}).get('name','合成图表示范'),demo())
+        body=request.get_json(silent=True) or {}
+        if body.get('kind')=='bars':
+            image,calibration,bars=demo_bars()
+            p=store.create(body.get('name','堆叠柱图表示范'),image)
+            return jsonify(store.update(p['id'],p['revision'],{'calibration':calibration,'bars':bars}))
+        p=store.create(body.get('name','合成图表示范'),demo())
         p=store.update(p['id'],p['revision'],{'calibration':{'origin':[100,460],'x_end':[760,460],
             'y_end':[100,65],'x':{'min':0,'max':10,'scale':'linear'},
             'y':{'min':0,'max':100,'scale':'linear'}}})
@@ -70,8 +76,8 @@ def install(app,root):
     @app.post('/chart/api/projects/<key>/extract')
     def run(key):
         p,image=store.capture(key)
-        series,overlay=extract(p,image)
-        return jsonify(store.publish(p,series,overlay))
+        series,bars,overlay=extract(p,image)
+        return jsonify(store.publish(p,series,overlay,bars))
 
     @app.get('/chart/api/projects/<key>/results/<rid>')
     def result(key,rid):
@@ -85,6 +91,10 @@ def install(app,root):
             return send_file(folder/'overlay.png',mimetype='image/png')
         if artifact=='data.csv':
             return send_file(io.BytesIO(csv_bytes(record['series'])),mimetype='text/csv',as_attachment=True,download_name='chart-data.csv')
+        if artifact=='bars.csv':
+            if not record.get('bars'):
+                raise Invalid('该结果没有堆叠柱数据')
+            return send_file(io.BytesIO(bars_csv_bytes(record['bars'])),mimetype='text/csv',as_attachment=True,download_name='chart-bars.csv')
         if artifact=='bundle.zip':
             return send_file(io.BytesIO(bundle(record,folder)),mimetype='application/zip',as_attachment=True,download_name='chart-extraction.zip')
         raise Invalid('文件不存在')

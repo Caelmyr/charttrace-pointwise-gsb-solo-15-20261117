@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from image_lab.validation import Invalid, Conflict
 from .coordinates import default_calibration, validate, finite
+from .bars import default_bars, bars_config
 
 
 def identifier():
@@ -73,7 +74,9 @@ class Store:
         path=self.directory(key)/'project.json'
         if not path.exists():
             raise Invalid('工程不存在')
-        return json.loads(path.read_text())
+        p=json.loads(path.read_text())
+        p.setdefault('bars',default_bars())
+        return p
 
     def write(self,p):
         directory=self.directory(p['id'])
@@ -91,7 +94,7 @@ class Store:
         with self.lock:
             p={'id':identifier(),'name':str(name)[:100],'revision':1,'created':time.time(),
                'source':None,'calibration':default_calibration(image.shape[1],image.shape[0]),
-               'series':[],'versions':[],'results':[],'current_result':None}
+               'series':[],'bars':default_bars(),'versions':[],'results':[],'current_result':None}
             self.write(p)
             p=self.replace_source(p['id'],1,image)
             return self.add_series(p['id'],p['revision'],'蓝色曲线')
@@ -119,6 +122,8 @@ class Store:
             p['calibration']=default_calibration(image.shape[1],image.shape[0])
             for series in p['series']:
                 series['anchors']=[]
+            p['bars']['items']=[]
+            p['bars']['zero_pixel']=None
         return self.mutate(key,expected,operation)
 
     def update(self,key,expected,data):
@@ -127,6 +132,8 @@ class Store:
                 p['name']=str(data['name'])[:100]
             if 'calibration' in data:
                 p['calibration']=validate(data['calibration'])
+            if 'bars' in data:
+                p['bars']=bars_config(data['bars'])
         return self.mutate(key,expected,operation)
 
     def add_series(self,key,expected,name):
@@ -173,7 +180,7 @@ class Store:
         with self.lock:
             p=self.read(key)
             self.revision(p,expected)
-            snapshot={k:copy.deepcopy(p[k]) for k in ('source','calibration','series')}
+            snapshot={k:copy.deepcopy(p[k]) for k in ('source','calibration','series','bars')}
             p['versions'].append({'id':identifier(),'label':str(label)[:80],'document':snapshot})
             p['versions']=p['versions'][-20:]
             p['revision']+=1
@@ -188,7 +195,7 @@ class Store:
             p.update(copy.deepcopy(v['document']))
         return self.mutate(key,expected,operation)
 
-    def publish(self,captured,series,overlay):
+    def publish(self,captured,series,overlay,bars=None):
         with self.lock:
             p=self.read(captured['id'])
             if p['revision']!=captured['revision']:
@@ -197,8 +204,8 @@ class Store:
             folder=self.directory(p['id'])/rid
             folder.mkdir()
             record={'id':rid,'revision':captured['revision'],'created':time.time(),
-                    'document':{k:copy.deepcopy(captured[k]) for k in ('source','calibration','series')},
-                    'series':series}
+                    'document':{k:copy.deepcopy(captured[k]) for k in ('source','calibration','series','bars')},
+                    'series':series,'bars':bars}
             (folder/'result.json').write_text(json.dumps(record,ensure_ascii=False))
             (folder/'overlay.png').write_bytes(encode(overlay))
             p['results'].append({'id':rid,'revision':record['revision'],'created':record['created']})
