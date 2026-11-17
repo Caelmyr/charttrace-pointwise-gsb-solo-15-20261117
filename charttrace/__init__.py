@@ -73,6 +73,12 @@ def install(app,root):
         series,overlay=extract(p,image)
         return jsonify(store.publish(p,series,overlay))
 
+    @app.post('/chart/api/projects/<key>/preview')
+    def preview(key):
+        p,image=store.capture(key)
+        series,overlay=extract(p,image)
+        return send_file(io.BytesIO(encode(overlay)),mimetype='image/png')
+
     @app.get('/chart/api/projects/<key>/results/<rid>')
     def result(key,rid):
         record,folder=store.result(key,None if rid=='current' else rid)

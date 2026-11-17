@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from image_lab.validation import Invalid, Conflict
 from .coordinates import default_calibration, validate, finite
+from .settings import defaults as default_settings, settings as normalize_settings
 
 
 def identifier():
@@ -36,26 +37,16 @@ def encode(image):
     return raw.tobytes()
 
 
-def defaults():
-    return {'color':[35,100,210],'tolerance':24.,'width':480,'height':320,
-            'max_step':20,'smoothness':2.,'min_confidence':.25,'gap_limit':8,'samples':100}
+defaults=default_settings
+settings=normalize_settings
 
 
-def settings(value):
-    s={**defaults(),**value}
-    for key,lower,upper in [('width',64,1200),('height',64,800),('max_step',1,80),
-                            ('gap_limit',0,80),('samples',10,2000)]:
-        if not isinstance(s[key],int) or not lower<=s[key]<=upper:
-            raise Invalid(key+' 超出范围')
-    for key,lower,upper in [('tolerance',1,100),('smoothness',0,100),('min_confidence',.01,.99)]:
-        s[key]=float(finite(s[key],key))
-        if not lower<=s[key]<=upper:
-            raise Invalid(key+' 超出范围')
-    color=finite(s['color'],'颜色')
-    if color.shape!=(3,) or color.min()<0 or color.max()>255:
-        raise Invalid('颜色需要三个0–255通道')
-    s['color']=color.tolist()
-    return s
+def normalize(p):
+    """Fill settings added after older projects and captures were saved."""
+    for series in p.get('series',[]):
+        series['settings']=normalize_settings(series.get('settings'))
+        series.setdefault('band_seeds',[])
+    return p
 
 
 class Store:
@@ -73,7 +64,7 @@ class Store:
         path=self.directory(key)/'project.json'
         if not path.exists():
             raise Invalid('工程不存在')
-        return json.loads(path.read_text())
+        return normalize(json.loads(path.read_text()))
 
     def write(self,p):
         directory=self.directory(p['id'])
@@ -119,6 +110,7 @@ class Store:
             p['calibration']=default_calibration(image.shape[1],image.shape[0])
             for series in p['series']:
                 series['anchors']=[]
+                series['band_seeds']=[]
         return self.mutate(key,expected,operation)
 
     def update(self,key,expected,data):
@@ -134,7 +126,7 @@ class Store:
             if len(p['series'])>=8:
                 raise Invalid('最多8条曲线')
             p['series'].append({'id':identifier(),'name':str(name)[:80],
-                                'settings':defaults(),'anchors':[]})
+                                'settings':defaults(),'anchors':[],'band_seeds':[]})
         return self.mutate(key,expected,operation)
 
     def edit_series(self,key,expected,sid,data):
@@ -156,6 +148,16 @@ class Store:
                         raise Invalid('手动点需要两个像素坐标')
                     anchors.append({'id':item.get('id',identifier()),'pixel':point.tolist()})
                 s['anchors']=anchors
+            if 'band_seeds' in data:
+                if not isinstance(data['band_seeds'],list) or len(data['band_seeds'])>40:
+                    raise Invalid('阴影带校对点最多40个')
+                seeds=[]
+                for item in data['band_seeds']:
+                    point=finite(item['pixel'],'阴影带校对点')
+                    if point.shape!=(2,):
+                        raise Invalid('阴影带校对点需要两个像素坐标')
+                    seeds.append({'id':item.get('id',identifier()),'pixel':point.tolist()})
+                s['band_seeds']=seeds
         return self.mutate(key,expected,operation)
 
     def delete_series(self,key,expected,sid):
@@ -185,7 +187,8 @@ class Store:
             v=next((v for v in p['versions'] if v['id']==vid),None)
             if v is None:
                 raise Invalid('版本不存在')
-            p.update(copy.deepcopy(v['document']))
+            document=normalize(copy.deepcopy(v['document']))
+            p.update(document)
         return self.mutate(key,expected,operation)
 
     def publish(self,captured,series,overlay):
