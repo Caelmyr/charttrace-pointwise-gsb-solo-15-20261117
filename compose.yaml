@@ -1,0 +1,10 @@
+services:
+  charttrace:
+    build: .
+    image: solo18-charttrace:1.0
+    ports: ["18918:18918"]
+    volumes: ["charttrace-data:/data"]
+    restart: unless-stopped
+volumes:
+  charttrace-data:
+    name: solo18-charttrace-data
